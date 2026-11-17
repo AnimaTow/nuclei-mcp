@@ -186,9 +186,22 @@ func HandleNucleiScanTool(
 		for i, finding := range result.Findings {
 			responseText += fmt.Sprintf("Finding #%d:\n", i+1)
 			responseText += fmt.Sprintf("- Name: %s\n", finding.Info.Name)
+			if finding.MatcherName != "" {
+				responseText += fmt.Sprintf("- Match: %s\n", finding.MatcherName)
+			}
+			if finding.ExtractorName != "" {
+				responseText += fmt.Sprintf("- Extractor: %s\n", finding.ExtractorName)
+			}
 			responseText += fmt.Sprintf("- Severity: %s\n", finding.Info.SeverityHolder.Severity.String())
 			responseText += fmt.Sprintf("- Description: %s\n", finding.Info.Description)
-			responseText += fmt.Sprintf("- URL: %s\n\n", finding.Host)
+			if len(finding.ExtractedResults) > 0 {
+				responseText += fmt.Sprintf("- Extracted: %s\n", strings.Join(finding.ExtractedResults, ", "))
+			}
+			host := finding.Host
+			if finding.Matched != "" {
+				host = finding.Matched
+			}
+			responseText += fmt.Sprintf("- URL: %s\n\n", host)
 		}
 	}
 
@@ -226,10 +239,12 @@ func HandleBasicScanTool(
 	}
 
 	type SimplifiedFinding struct {
-		Name        string `json:"name"`
-		Severity    string `json:"severity"`
-		Description string `json:"description"`
-		URL         string `json:"url"`
+		Name        string   `json:"name"`
+		Match       string   `json:"match,omitempty"`
+		Severity    string   `json:"severity"`
+		Description string   `json:"description"`
+		Extracted   []string `json:"extracted,omitempty"`
+		URL         string   `json:"url"`
 	}
 
 	simplifiedFindings := make([]SimplifiedFinding, 0, len(result.Findings))
@@ -243,11 +258,18 @@ func HandleBasicScanTool(
 			severity = finding.Info.SeverityHolder.Severity.String()
 		}
 
+		url := finding.Host
+		if finding.Matched != "" {
+			url = finding.Matched
+		}
+
 		simplifiedFindings = append(simplifiedFindings, SimplifiedFinding{
 			Name:        finding.Info.Name,
+			Match:       finding.MatcherName,
 			Severity:    severity,
 			Description: finding.Info.Description,
-			URL:         finding.Host,
+			Extracted:   finding.ExtractedResults,
+			URL:         url,
 		})
 	}
 
