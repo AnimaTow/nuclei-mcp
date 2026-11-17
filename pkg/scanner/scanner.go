@@ -90,7 +90,18 @@ func (s *ScannerService) loadTemplates(templateIDs []string) (lib.TemplateSource
 	return templateSources, nil
 }
 
-func (s *ScannerService) Scan(target string, severityFilter string, protocolFilter string, templateIDs []string) (cache.ScanResult, error) {
+func (s *ScannerService) Scan(target string, severityFilter string, protocolFilter string, templateIDs []string) (scanResult cache.ScanResult, scanErr error) {
+	// Teilschutz: ein Panic in DIESER Goroutine (z. B. Template-Parsing) wird zu
+	// einem Fehler statt den ganzen MCP-Server zu toeten. Panics in Kind-Goroutinen
+	// des HTTP-Transports kann Go nicht abfangen -> dort greift die Docker-Restart-Policy.
+	defer func() {
+		if r := recover(); r != nil {
+			s.console.Log("PANIC im Scan abgefangen (Ziel %s): %v", target, r)
+			scanResult = cache.ScanResult{}
+			scanErr = fmt.Errorf("scan abgebrochen (interner Panic, evtl. zu grosse/aggressive Template-Menge): %v", r)
+		}
+	}()
+
 	cacheKey := s.CreateCacheKey(target, severityFilter, protocolFilter)
 
 	if len(templateIDs) > 0 {
