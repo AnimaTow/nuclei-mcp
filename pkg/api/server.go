@@ -30,8 +30,7 @@ func NewNucleiMCPServer(service scanner.ScannerServiceInterface, logger *log.Log
 			mcp.Required(),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Minimum severity level (info, low, medium, high, critical)"),
-			mcp.DefaultString("info"),
+			mcp.Description("Optional severity filter (info, low, medium, high, critical). Leave empty to run templates of ALL severities (needed for CVE/vulnerability templates)."),
 		),
 		mcp.WithString("protocols",
 			mcp.Description("Protocols to scan (comma-separated: http,https,tcp,etc)"),
@@ -142,7 +141,9 @@ func HandleNucleiScanTool(
 		return mcp.NewToolResultError(fmt.Sprintf("ABGELEHNT: %s. Erlaubter Pruefumfang: %s", reason, strings.Join(scope.Describe(), ", "))), nil
 	}
 
-	severity := "info"
+	// Leer = kein Severity-Filter (alle Schweregrade). Ein fester "info"-Default
+	// wuerde CVE-/Schwachstellen-Templates (high/critical) stillschweigend wegfiltern.
+	severity := ""
 	if severityVal, exists := argMap["severity"]; exists && severityVal != nil {
 		if s, ok := severityVal.(string); ok && s != "" {
 			severity = s
