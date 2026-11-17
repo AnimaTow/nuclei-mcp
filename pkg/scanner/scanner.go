@@ -138,7 +138,9 @@ func (s *ScannerService) Scan(target string, severityFilter string, protocolFilt
 	var findings []*output.ResultEvent
 	var findingsMutex sync.Mutex
 
-	ne.LoadTargets([]string{target}, false)
+	// Auf HTTP sondieren (true): so werden auch nackte IPs/Hosts fuer HTTP-Templates
+	// korrekt mit http(s):// adressiert, nicht nur vollstaendige URLs.
+	ne.LoadTargets([]string{target}, true)
 
 	callback := func(event *output.ResultEvent) {
 		findingsMutex.Lock()
