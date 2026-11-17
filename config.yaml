@@ -2,7 +2,7 @@ server:
   name: "nuclei-scanner"
   version: "1.0.0"
   port: 3000
-  host: "127.0.0.1"
+  host: "127.0.0.1"   # override at runtime, e.g. NUCLEI_MCP_SERVER_HOST=0.0.0.0 in a container
 
 cache:
   enabled: true
@@ -10,15 +10,16 @@ cache:
   max_size: 1000
 
 logging:
-  level: "debug"  # debug, info, warn, error
-  path: "C:/Users/User/sources/nuclei-mcp/logs/nuclei_mcp.log"
+  level: "info"        # debug, info, warn, error
+  path: "logs/nuclei_mcp.log"
   max_size_mb: 10
   max_backups: 5
   max_age_days: 30
   compress: true
 
 nuclei:
-  templates_directory: "C:\\Users\\User\\sources\\nuclei-mcp\\nuclei-templates"
+  templates_directory: "nuclei-templates"
+  basic_template_name: "basic-test.yaml"
   timeout: 30s
   rate_limit: 150
   bulk_size: 25

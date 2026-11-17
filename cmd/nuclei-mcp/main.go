@@ -91,14 +91,37 @@ func main() {
 
 	mcpServer := api.NewNucleiMCPServer(scannerService, log.New(os.Stderr, "[MCP] ", log.LstdFlags), templateManager)
 
+	// Transport waehlen: "http" (streamable-http, fuer entfernte MCP-Clients wie
+	// Open WebUI) oder "stdio" (Default, Subprozess-Modus). Steuerung ueber das
+	// erste Argument ("http"/"stdio") oder die Umgebungsvariable MCP_TRANSPORT.
+	transport := "stdio"
+	if t := os.Getenv("MCP_TRANSPORT"); t != "" {
+		transport = t
+	}
+	if len(os.Args) > 1 && (os.Args[1] == "http" || os.Args[1] == "stdio") {
+		transport = os.Args[1]
+	}
+
 	serverErr := make(chan error, 1)
-	go func() {
-		consoleLogger.Log("Starting MCP server with stdio transport")
-		if err := mcp.ServeStdio(mcpServer); err != nil {
-			serverErr <- fmt.Errorf("error starting MCP server: %w", err)
-			return
-		}
-	}()
+	if transport == "http" {
+		addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+		httpServer := mcp.NewStreamableHTTPServer(mcpServer, mcp.WithStateLess(true))
+		go func() {
+			consoleLogger.Log("Starting MCP server with streamable-http transport on http://%s/mcp", addr)
+			if err := httpServer.Start(addr); err != nil {
+				serverErr <- fmt.Errorf("error starting MCP HTTP server: %w", err)
+				return
+			}
+		}()
+	} else {
+		go func() {
+			consoleLogger.Log("Starting MCP server with stdio transport")
+			if err := mcp.ServeStdio(mcpServer); err != nil {
+				serverErr <- fmt.Errorf("error starting MCP server: %w", err)
+				return
+			}
+		}()
+	}
 
 	signals := setupSignalHandling()
 

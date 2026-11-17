@@ -1,0 +1,7 @@
+{
+  "_hinweis": "Beispielwerte (RFC 5737, Dokumentation). Eigene Netze eintragen, via NUCLEI_ALLOW setzen oder diese Datei read-only in den Container mounten. Ohne gueltige Eintraege wird nur 127.0.0.1/32 zugelassen (fail-closed).",
+  "allow": [
+    "127.0.0.1/32",
+    "192.0.2.0/24"
+  ]
+}

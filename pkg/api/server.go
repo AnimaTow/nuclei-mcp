@@ -10,6 +10,7 @@ import (
 
 	"nuclei-mcp/pkg/cache"
 	"nuclei-mcp/pkg/scanner"
+	"nuclei-mcp/pkg/scope"
 	"nuclei-mcp/pkg/templates"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -87,7 +88,38 @@ func NewNucleiMCPServer(service scanner.ScannerServiceInterface, logger *log.Log
 		return HandleGetTemplate(ctx, request, tm)
 	})
 
+	mcpServer.AddTool(mcp.NewTool("nuclei_scope",
+		mcp.WithDescription("Lists the allowed target networks (scope). Scans against targets outside this scope are rejected."),
+	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return mcp.NewToolResultText(fmt.Sprintf("Erlaubter Pruefumfang (nur diese Netze werden gescannt):\n- %s", strings.Join(scope.Describe(), "\n- "))), nil
+	})
+
 	return mcpServer
+}
+
+// sanitizeProtocols bereinigt die Protokoll-Filter fuer die nuclei-SDK.
+// "https" ist kein eigener nuclei-Protokolltyp (es faellt unter "http"); ungueltige
+// Werte wuerden den Scan abbrechen. Unbekanntes wird verworfen, Duplikate entfernt.
+func sanitizeProtocols(s string) string {
+	valid := map[string]bool{
+		"dns": true, "file": true, "http": true, "headless": true, "network": true,
+		"ssl": true, "websocket": true, "whois": true, "code": true, "javascript": true,
+		"tcp": true, "udp": true,
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, tok := range strings.Split(s, ",") {
+		tok = strings.ToLower(strings.TrimSpace(tok))
+		if tok == "https" {
+			tok = "http"
+		}
+		if tok == "" || !valid[tok] || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	return strings.Join(out, ",")
 }
 
 func HandleNucleiScanTool(
@@ -110,6 +142,10 @@ func HandleNucleiScanTool(
 		return nil, fmt.Errorf("invalid target parameter: must be a non-empty string")
 	}
 
+	if ok, reason := scope.TargetAllowed(target); !ok {
+		return mcp.NewToolResultError(fmt.Sprintf("ABGELEHNT: %s. Erlaubter Pruefumfang: %s", reason, strings.Join(scope.Describe(), ", "))), nil
+	}
+
 	severity := "info"
 	if severityVal, exists := argMap["severity"]; exists && severityVal != nil {
 		if s, ok := severityVal.(string); ok && s != "" {
@@ -117,12 +153,13 @@ func HandleNucleiScanTool(
 		}
 	}
 
-	protocols := "http,https"
+	protocols := ""
 	if protocolsVal, exists := argMap["protocols"]; exists && protocolsVal != nil {
 		if p, ok := protocolsVal.(string); ok && p != "" {
 			protocols = p
 		}
 	}
+	protocols = sanitizeProtocols(protocols)
 
 	threadSafe := false
 	if threadSafeVal, exists := argMap["thread_safe"]; exists && threadSafeVal != nil {
@@ -193,6 +230,10 @@ func HandleBasicScanTool(
 	target, ok := targetVal.(string)
 	if !ok || target == "" {
 		return nil, fmt.Errorf("invalid target parameter: must be a non-empty string")
+	}
+
+	if ok, reason := scope.TargetAllowed(target); !ok {
+		return mcp.NewToolResultError(fmt.Sprintf("ABGELEHNT: %s. Erlaubter Pruefumfang: %s", reason, strings.Join(scope.Describe(), ", "))), nil
 	}
 
 	result, err := service.BasicScan(target)

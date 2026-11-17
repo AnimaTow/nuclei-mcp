@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -66,6 +67,11 @@ func LoadConfig(path string) (config Config, err error) {
 	viper.SetDefault("logging.compress", true)
 	viper.SetDefault("nuclei.templates_directory", "nuclei-templates")
 	viper.SetDefault("nuclei.basic_template_name", "basic-test.yaml")
+
+	// Environment overrides, e.g. NUCLEI_MCP_SERVER_HOST, NUCLEI_MCP_SERVER_PORT.
+	viper.SetEnvPrefix("NUCLEI_MCP")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
 
 	// Set config file
 	if path != "" {
