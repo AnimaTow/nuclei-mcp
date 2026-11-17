@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"nuclei-mcp/pkg/cache"
 	"nuclei-mcp/pkg/scanner"
 	"nuclei-mcp/pkg/scope"
 	"nuclei-mcp/pkg/templates"
@@ -37,9 +36,6 @@ func NewNucleiMCPServer(service scanner.ScannerServiceInterface, logger *log.Log
 		mcp.WithString("protocols",
 			mcp.Description("Protocols to scan (comma-separated: http,https,tcp,etc)"),
 			mcp.DefaultString("http"),
-		),
-		mcp.WithBoolean("thread_safe",
-			mcp.Description("Use thread-safe engine for scanning"),
 		),
 		mcp.WithString("template_ids",
 			mcp.Description("Comma-separated template IDs to run (e.g. \"self-signed-ssl,nameserver-fingerprint\")"),
@@ -161,13 +157,6 @@ func HandleNucleiScanTool(
 	}
 	protocols = sanitizeProtocols(protocols)
 
-	threadSafe := false
-	if threadSafeVal, exists := argMap["thread_safe"]; exists && threadSafeVal != nil {
-		if ts, ok := threadSafeVal.(bool); ok {
-			threadSafe = ts
-		}
-	}
-
 	var templateIDs []string
 	if idsVal, exists := argMap["template_ids"]; exists && idsVal != nil {
 		if ids, ok := idsVal.(string); ok && ids != "" {
@@ -181,15 +170,9 @@ func HandleNucleiScanTool(
 		}
 	}
 
-	var result cache.ScanResult
-	var err error
-
-	if threadSafe {
-		result, err = service.ThreadSafeScan(ctx, target, severity, protocols, templateIDs)
-	} else {
-		result, err = service.Scan(target, severity, protocols, templateIDs)
-	}
-
+	// Immer der sondierende Scan-Pfad: adressiert auch nackte IPs/Hosts fuer
+	// HTTP-Templates korrekt. (Der thread-safe-Pfad sondierte nicht -> Fehltreffer.)
+	result, err := service.Scan(target, severity, protocols, templateIDs)
 	if err != nil {
 		return nil, fmt.Errorf("scan failed: %w", err)
 	}
